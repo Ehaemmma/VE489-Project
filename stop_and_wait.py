@@ -37,9 +37,11 @@ class Sender:
 
             print('send %d %d' % (self.frame_counter, frame))
             if random.random() > self.frame_error_rate:
+                print('frame %d sent.' % self.frame_counter)
                 self.event_loop.add_event(
                     Event(receiver.receive_frame, event_loop.current_time + total_time, frame, self))
-
+            else:
+                print('frame %d error.' % self.frame_counter)
             self.event_loop.add_event(
                 Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.frame_counter))
 
@@ -52,7 +54,7 @@ class Sender:
     def handle_ack(self, receiver, ack):
         if random.random() > self.ack_error_rate:
             if ack == self.frame_counter ^ 1:
-                print('%d ack' % self.frame_counter)
+                print('frame %d acked.' % self.frame_counter)
                 self.frame_counter ^= 1
                 self.frames = self.frames[1:]
                 if not self.transmitting:
@@ -124,14 +126,14 @@ class EventLoop:
 
 
 if __name__ == "__main__":
-    time_limit = 1
+    time_limit = 1 * 60  # seconds
 
     bandwidth = 1  # Mbps
-    delay = 1  # ms
-    bit_error_rate = 0
+    delay = 100  # ms
+    bit_error_rate = 1e-5
     frame_size = 1250 * 8 # bits
     ack_size = 25 * 8  # bits
-    header_size = 1  # bit
+    header_size = 25 * 8  # bit
     num_frames = 1000000
 
     event_loop = EventLoop()
@@ -158,5 +160,5 @@ if __name__ == "__main__":
     efficiency = (1 - header_size / frame_size) * len(receiver.received_frames) * frame_size / event_loop.current_time / bandwidth / 1e6
     print('experimental efficiency: %f' % efficiency)
     # calculate theoretical efficiency
-    theoretical_efficiency = (1 - header_size / frame_size) / (1 + ack_size / frame_size + 2 * delay * 1000 * bandwidth / frame_size)
+    theoretical_efficiency = (1 - header_size / frame_size) / (1 + ack_size / frame_size + 2 * delay * 1000 * bandwidth / frame_size) * (1 - bit_error_rate) ** (frame_size + ack_size)
     print('theoretical efficiency: %f' % theoretical_efficiency)
