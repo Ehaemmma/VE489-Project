@@ -1,7 +1,8 @@
 ### Stop and Wait ARQ Protocol Simulation
 
-This Python code simulates the Stop and Wait Automatic Repeat Request (ARQ) protocol, which is a simple flow control method used in telecommunications to ensure reliable and ordered delivery of data frames.#### Events
+This Python code simulates the Stop and Wait Automatic Repeat Request (ARQ) protocol, which is a simple flow control method used in telecommunications to ensure reliable and ordered delivery of data frames.
 
+#### Events
 The simulation is based on an event-driven programming approach, where different events are processed by the event loop. The main events in the Stop and Wait ARQ protocol simulation are:1. **Generate All Frames**: This event is triggered at the beginning of the simulation to generate all the frames that the sender will send to the receiver.
 
 1. **Send Frame**: This event is triggered when the sender sends a frame to the receiver. The sender calculates the total time it takes for the frame to be transmitted and received, and adds a `receive_frame` event to the event loop with the appropriate timestamp. It also adds a `handle_timeout` event to the event loop.
