@@ -1,0 +1,4 @@
+bandwidth: 1Mbps
+delay: 1ms
+theoretical efficiency: 0.8195901639344263
+experimental efficiency: 0.8195901639344266
