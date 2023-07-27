@@ -131,6 +131,15 @@ class EventLoop:
         heapq.heappush(self.event_queue, event)
 
 
+def WriteOutput():
+    file = open('output.txt', mode='w', encoding='utf-8')
+    file.write('bandwidth: ' + str(bandwidth) + '\n')
+    file.write('delay: ' + str(delay) + '\n')
+    file.write('theoretical efficiency: ' + str(theoretical_efficiency) + '\n')
+    file.write('experimental efficiency: ' + str(efficiency) + '\n')
+    file.close()
+
+
 if __name__ == "__main__":
     time_limit = 1 * 60  # seconds
 
@@ -168,3 +177,12 @@ if __name__ == "__main__":
     # calculate theoretical efficiency
     theoretical_efficiency = (1 - header_size / frame_size) / (1 + ack_size / frame_size + 2 * delay * 1000 * bandwidth / frame_size) * (1 - bit_error_rate) ** (frame_size + ack_size)
     print('theoretical efficiency: %f' % theoretical_efficiency)
+
+    # write main data into output files
+    file = open('output.txt', mode='w', encoding='utf-8')
+    file.write('bandwidth: ' + str(bandwidth) + 'Mbps\n')
+    file.write('delay: ' + str(delay) + 'ms\n')
+    file.write('bit error rate: ' + str(bit_error_rate) + '\n')
+    file.write('theoretical efficiency: ' + str(theoretical_efficiency) + '\n')
+    file.write('experimental efficiency: ' + str(efficiency) + '\n')
+    file.close()
