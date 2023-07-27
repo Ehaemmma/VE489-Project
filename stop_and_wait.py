@@ -14,14 +14,16 @@ class Sender:
         self.frames = []
         self.frame_counter = 0  # first un-ACKed frame number
         self.event_loop = event_loop
-        self.transmitting = False
-        self.transmission_flag = False
+        self.transmitting = False  # indicate whether the sender is transmitting a frame
+        self.transmission_flag = False  # indicate whether there is a frame to be resent (but is waiting for the transmission to be ended)
 
     def generate_all_frames(self, num_frames):
         # Add frame sequence number to bit 0
+        # One bit frame sequence number for stop and wait
         self.frames = [(i << 1) | (i & 1) for i in range(num_frames)]
 
     def finish_transmission(self, receiver):
+        # one fransmission is finished, next transmission can be started
         self.transmitting = False
         if self.transmission_flag:
             self.transmission_flag = False
@@ -37,6 +39,7 @@ class Sender:
 
             print('send %d %d' % (self.frame_counter, frame))
             if random.random() > self.frame_error_rate:
+                # If no frame error
                 print('frame %d sent.' % self.frame_counter)
                 self.event_loop.add_event(
                     Event(receiver.receive_frame, event_loop.current_time + total_time, frame, self))
@@ -45,6 +48,7 @@ class Sender:
             self.event_loop.add_event(
                 Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.frame_counter))
 
+            # set the flag to indicate the sender is transmitting
             self.transmitting = True
 
             self.event_loop.add_event(
@@ -63,6 +67,7 @@ class Sender:
                     self.transmission_flag = True
 
     def handle_timeout(self, receiver, timeout_frame_number):
+        # resend when timeout
         if self.frame_counter == timeout_frame_number:
             print('resend %d' % self.frame_counter)
             if not self.transmitting:
@@ -83,6 +88,7 @@ class Receiver:
         self.event_loop = event_loop
 
     def receive_frame(self, frame, sender):
+        # extract the one bit frame sequence number and compare to the expected frame number
         if (frame & 1) == self.expected_frame:
             self.received_frames.append(frame >> 1)
             self.expected_frame ^= 1
