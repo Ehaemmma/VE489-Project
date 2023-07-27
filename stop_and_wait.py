@@ -15,7 +15,7 @@ class Sender:
         self.frame_counter = 0  # first un-ACKed frame number
         self.event_loop = event_loop
         self.transmitting = False  # indicate whether the sender is transmitting a frame
-        self.transmission_flag = False  # indicate whether there is a frame to be resent (but is waiting for the transmission to be ended)
+        self.transmission_flag = False  # indicate whether there is a frame to be sent (but is waiting for the transmission to be ended)
 
     def generate_all_frames(self, num_frames):
         # Add frame sequence number to bit 0
