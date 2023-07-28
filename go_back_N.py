@@ -4,10 +4,10 @@ from stop_and_wait import Sender, Receiver, Event, EventLoop, WriteOutput
 
 
 class GBN_Sender(Sender):
-    def __init__(self, bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, N):
+    def __init__(self, bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size):
         super().__init__(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop)
-        self.n_o = np.ceil(np.log2(N + 1))
-        self.window_size = 1 << self.n_o
+        self.n_o = np.ceil(np.log2(window_size + 1))
+        self.window_size = window_size
         self.next_frame = 0
         self.latest_unacked_frame = 0
         self.send_window = [-1 for i in range(self.window_size)]
@@ -23,13 +23,16 @@ class GBN_Sender(Sender):
         self.frames = [(i << self.n_o) | (i & ((1 << self.n_o) - 1)) for i in range(num_frames)]
 
     def finish_transmission(self, receiver):
-        # one fransmission is finished, next transmission can be started
+        # one transmission is finished, next transmission can be started
         self.transmitting = False
         if self.timeout_flag:
             self.timeout_flag = False
-            # Do something
+            self.go_back_N()
+        else:
+            self.send_frame(receiver)
 
     def load_frames(self):
+        # load frames to window
         window_index = self.next_frame
         while self.send_window[window_index] == -1:
             if len(self.frames) == 0:
@@ -39,10 +42,10 @@ class GBN_Sender(Sender):
             window_index = (1 + window_index) % self.window_size
 
     def go_back_N(self):
-        pass
+        self.next_frame = self.latest_unacked_frame
 
     def send_frame(self, receiver):
-        if SOMETHING:
+        if self.next_frame - self.latest_unacked_frame >= self.window_size:
             self.go_back_N()
         if self.send_window[self.next_frame] == -1:
             self.load_frames()
@@ -68,20 +71,29 @@ class GBN_Sender(Sender):
 
     def handle_ack(self, receiver, ack):
         # to be modified
+        # identify ack frame number
+        # clear self.send_window[frame number] (set to -1)
         pass
 
     def handle_timeout(self, receiver, timeout_frame_number):
         # to be modified
+        # check whether timeout happens
+        # when timeout, go back N and .
         pass
 
 
 class GBN_Receiver(Receiver):
-    pass
+    def __init__(self, bandwidth, delay, bit_error_rate, ack_size, event_loop, window_size):
+        super().__init__(bandwidth, delay, bit_error_rate, ack_size, event_loop)
+        self.window_size = window_size
+        self.sequence_number_length = int(np.ceil(np.log2(self.window_size + 1)))
 
     def receive_frame(self, frame, sender):
-        if (frame & 1) == self.expected_frame:
-            self.received_frames.append(frame >> 1)
-            self.expected_frame ^= 1
+        # check frame sequence number
+        # to be modified. length of frame sequence number differs from stop and wait
+        if (frame & ((1 << self.sequence_number_length) - 1)) == self.expected_frame:
+            self.received_frames.append(frame >> self.sequence_number_length)
+            self.expected_frame = (self.expected_frame + 1) & ((1 << self.sequence_number_length) - 1)
         self.send_ack(sender)
 
 
@@ -95,10 +107,11 @@ if __name__ == "__main__":
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
     num_frames = 1000000
+    window_size = 4
 
     event_loop = EventLoop()
-    sender = GBN_Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop)
-    receiver = GBN_Receiver(bandwidth, delay, bit_error_rate, ack_size, event_loop)
+    sender = GBN_Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size)
+    receiver = GBN_Receiver(bandwidth, delay, bit_error_rate, ack_size, event_loop, window_size)
 
     # Add the initial event to generate all frames
     sender.generate_all_frames(num_frames)
