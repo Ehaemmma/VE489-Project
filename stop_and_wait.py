@@ -92,7 +92,7 @@ class Receiver:
         if (frame & 1) == self.expected_frame:
             self.received_frames.append(frame >> 1)
             self.expected_frame ^= 1
-        self.send_ack(sender)
+            self.send_ack(sender)
 
     def send_ack(self, sender):
         transmission_time = self.ack_size / (self.bandwidth * 1e6)
