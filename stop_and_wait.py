@@ -99,7 +99,7 @@ class Receiver:
         propagation_time = self.delay / 1000
         total_time = transmission_time + propagation_time
         self.event_loop.add_event(
-            Event(sender.handle_ack, event_loop.current_time + total_time, self, self.expected_frame))
+            Event(sender.handle_ack, self.event_loop.current_time + total_time, self, self.expected_frame))
 
 
 class Event:
