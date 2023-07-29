@@ -112,7 +112,7 @@ class Event:
         return self.timestamp < other.timestamp
 
     def __str__(self):
-        return "% .1f\n" % (self.timestamp*1000) + self.handler.__name__
+        return "%.1f\n" % (self.timestamp*1000) + self.handler.__name__
 
 
 class EventLoop:
@@ -145,11 +145,11 @@ if __name__ == "__main__":
 
     bandwidth = 1  # Mbps
     delay = 100  # ms
-    bit_error_rate = 1e-5
+    bit_error_rate = 0
     frame_size = 1250 * 8 # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
-    num_frames = 10000
+    num_frames = 10
 
     event_loop = EventLoop()
     sender = Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop)

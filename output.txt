@@ -1,5 +1,5 @@
 bandwidth: 1Mbps
 delay: 100ms
-bit error rate: 1e-05
-theoretical efficiency: 0.04210126114647223
-experimental efficiency: 0.040643040116722574
+bit error rate: 0
+theoretical efficiency: 0.046622264509990484
+experimental efficiency: 0.04638199411022296

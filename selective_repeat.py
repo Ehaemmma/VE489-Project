@@ -4,31 +4,36 @@ import numpy as np
 import random
 
 
-class SR_Sender(GBN_Sender):
+class SR_Sender(Sender):
     def __init__(self, bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size):
-        super().__init__(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size)
-        self.resend_queue = []
+        super().__init__(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop)
+        self.window_size = window_size
+        self.latest_unacked_frame = 0
+        self.next_frame = 0
+
+    def generate_all_frames(self, num_frames):
+        # Add frame sequence number to bit 0
+        # One bit frame sequence number for stop and wait
+        self.frames = [i for i in range(num_frames)]
 
     def send_frame(self, receiver):
         frame = -1
-        # check whether resend is need
-        if len(self.resend_queue) != 0:
-            frame = self.latest_unacked_frame
-            self.resend_queue.pop()  # should be only 1 elements in the queue
-            # seletive repeat
-            pass
+
+        if self.transmission_flag:
+            frame = self.next_frame
+            self.transmission_flag = False
         else:
             if self.next_frame - self.latest_unacked_frame >= self.window_size:
-                pass
-                # do something
-            if self.send_window[self.next_frame] == -1:
-                self.load_frames()
-            frame = self.frames[self.next_frame]
-
+                self.next_frame = self.latest_unacked_frame
+            else:
+                frame = self.frame_counter
+                self.frame_counter += 1
+                if frame >= len(self.frames):
+                    frame = -1
             if frame == -1:
                 # No frame to send
                 return
-            self.next_frame = (self.next_frame + 1) % self.window_size
+
         transmission_time = self.frame_size / (self.bandwidth * 1e6)
         propagation_time = self.delay / 1000
         total_time = transmission_time + propagation_time
@@ -43,13 +48,33 @@ class SR_Sender(GBN_Sender):
         self.event_loop.add_event(
             Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.next_frame))
 
+        self.transmitting = True
+
+        self.event_loop.add_event(
+            Event(self.finish_transmission, event_loop.current_time + transmission_time, receiver)
+        )
+
     def handle_ack(self, receiver, ack):
+        if random.random() > self.ack_error_rate:  # successfully receive ack
+            if ack == self.latest_unacked_frame + 1:
+                print('frame ' + str(self.latest_unacked_frame) + ' acked.')
+                self.next_frame = ack
+                if not self.transmitting:
+                    self.send_frame(receiver)
+                else:
+                    self.transmission_flag = True
+        else:  # ack transmission fail
+            pass
+
+    def handle_timeout(self, receiver, timeout_frame_number):
+        # resend when timeout
         pass
 
 
 class SR_Receiver(Receiver):
-    def __init__(self, bandwidth, delay, bit_error_rate, ack_size, event_loop):
+    def __init__(self, bandwidth, delay, bit_error_rate, ack_size, event_loop, window_size):
         super().__init__(bandwidth, delay, bit_error_rate, ack_size, event_loop)
+        self.window_size = window_size
         self.unreceived_frames = []
 
     def receive_frame(self, frame, sender):
@@ -85,16 +110,16 @@ if __name__ == "__main__":
 
     bandwidth = 1  # Mbps
     delay = 100  # ms
-    bit_error_rate = 1e-5
+    bit_error_rate = 0
     frame_size = 1250 * 8  # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
-    num_frames = 1000000
+    num_frames = 10
     window_size = 4
 
     event_loop = EventLoop()
-    sender = GBN_Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size)
-    receiver = GBN_Receiver(bandwidth, delay, bit_error_rate, ack_size, event_loop, window_size)
+    sender = SR_Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size)
+    receiver = SR_Receiver(bandwidth, delay, bit_error_rate, ack_size, event_loop, window_size)
 
     # Add the initial event to generate all frames
     sender.generate_all_frames(num_frames)
