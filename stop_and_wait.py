@@ -99,7 +99,7 @@ class Receiver:
         propagation_time = self.delay / 1000
         total_time = transmission_time + propagation_time
         self.event_loop.add_event(
-            Event(sender.handle_ack, event_loop.current_time + total_time, self, self.expected_frame))
+            Event(sender.handle_ack, self.event_loop.current_time + total_time, self, self.expected_frame))
 
 
 class Event:
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     frame_size = 1250 * 8 # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
-    num_frames = 10
+    num_frames = 20
 
     event_loop = EventLoop()
     sender = Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop)
