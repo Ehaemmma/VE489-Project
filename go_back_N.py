@@ -40,10 +40,11 @@ class GBN_Sender(Sender):
 
     def go_back_N(self):
         print('go back N.')
+        print('resend from %d.' % self.latest_unacked_frame)
         self.next_frame = self.latest_unacked_frame
 
     def send_frame(self, receiver):
-        if self.next_frame - self.latest_unacked_frame >= self.window_size:
+        if self.next_frame - self.latest_unacked_frame >= self.window_size or (self.next_frame < self.latest_unacked_frame and self.next_frame + (1 << self.n_o) - 1 - self.latest_unacked_frame >= self.window_size):
             self.go_back_N()
         if self.send_window[self.next_frame] == -1:
             self.load_frames()
@@ -79,10 +80,16 @@ class GBN_Sender(Sender):
         # identify ack frame number
         # clear self.send_window[frame number] (set to -1)
         if random.random() > self.ack_error_rate:
-            if ack == (self.latest_unacked_frame + 1) & ((1 << self.n_o) - 1):
-                print('frame %d acked.' % self.latest_unacked_frame)
-                self.send_window[self.latest_unacked_frame] = -1
-                self.latest_unacked_frame = (self.latest_unacked_frame + 1) & ((1 << self.n_o) - 1)
+            l = (self.latest_unacked_frame + 1) & ((1 << self.n_o) - 1)
+            r = self.next_frame
+            ack_in_window = (l <= ack <= r) if l <= r else (l <= ack or ack <= r)
+            if ack_in_window:
+                while not self.latest_unacked_frame == ack:
+                    print('frame %d acked.' % self.latest_unacked_frame)
+                    self.send_window[self.latest_unacked_frame] = -1
+                    self.latest_unacked_frame = (self.latest_unacked_frame + 1) & ((1 << self.n_o) - 1)
+                # self.latest_unacked_frame = ack
+                # self.latest_unacked_frame = (self.latest_unacked_frame + 1) & ((1 << self.n_o) - 1)
 
     def handle_timeout(self, receiver, timeout_frame_number):
         # to be modified
@@ -100,9 +107,9 @@ class GBN_Receiver(Receiver):
     def receive_frame(self, frame, sender):
         # check frame sequence number
         # to be modified. length of frame sequence number differs from stop and wait
-        print('frame %d arrives.' % (frame >> self.sequence_number_length))
+        # print('frame %d arrives.' % (frame >> self.sequence_number_length))
         if (frame & ((1 << self.sequence_number_length) - 1)) == self.expected_frame:
-            print('frame %d acked.' % self.expected_frame)
+            # print('frame %d acked.' % self.expected_frame)
             self.received_frames.append(frame >> self.sequence_number_length)
             self.expected_frame = (self.expected_frame + 1) & ((1 << self.sequence_number_length) - 1)
         else:
@@ -119,7 +126,7 @@ if __name__ == "__main__":
     frame_size = 1250 * 8  # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
-    frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size + ack_size)
+    frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size)
     num_frames = 1000000
     window_size = 10
 
