@@ -1,106 +1,143 @@
-import numpy as np
+import heapq
 import random
-from stop_and_wait import Sender, Receiver, Event, EventLoop, WriteOutput
 
 
-class GBN_Sender(Sender):
-    def __init__(self, bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size):
-        super().__init__(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop)
-        self.n_o = np.ceil(np.log2(window_size + 1))
-        self.window_size = window_size
-        self.next_frame = 0
-        self.latest_unacked_frame = 0
-        self.send_window = [-1 for i in range(self.window_size)]
-        self.timeout_flag = False
+class Sender:
+    def __init__(self, bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop):
+        self.bandwidth = bandwidth
+        self.delay = delay
+        self.bit_error_rate = bit_error_rate
+        self.frame_size = frame_size
+        self.ack_size = ack_size
         self.frame_error_rate = 1 - (1 - bit_error_rate) ** frame_size
         self.ack_error_rate = 1 - (1 - bit_error_rate) ** ack_size
+        self.frames = []
+        self.frame_counter = 0  # first un-ACKed frame number
+        self.event_loop = event_loop
+        self.transmitting = False  # indicate whether the sender is transmitting a frame
+        self.transmission_flag = False  # indicate whether there is a frame to be sent (but is waiting for the transmission to be ended)
 
     def generate_all_frames(self, num_frames):
-        # Add frame sequence number to the rightmost bits
-        self.frames = [(i << self.n_o) | (i & ((1 << self.n_o) - 1)) for i in range(num_frames)]
+        # Add frame sequence number to bit 0
+        # One bit frame sequence number for stop and wait
+        self.frames = [(i << 1) | (i & 1) for i in range(num_frames)]
 
     def finish_transmission(self, receiver):
-        # one transmission is finished, next transmission can be started
+        # one fransmission is finished, next transmission can be started
         self.transmitting = False
-        if self.timeout_flag:
-            self.timeout_flag = False
-            self.go_back_N()
-        else:
+        if self.transmission_flag:
+            self.transmission_flag = False
             self.send_frame(receiver)
 
-    def load_frames(self):
-        # load frames to window
-        window_index = self.next_frame
-        while self.send_window[window_index % self.window_size] == -1:
-            if len(self.frames) == 0:
-                return
-            self.send_window[window_index] = self.frames[0]
-            self.frames = self.frames[1:]
-            window_index = (1 + window_index) % self.window_size
-
-    def go_back_N(self):
-        self.next_frame = self.latest_unacked_frame
-
     def send_frame(self, receiver):
-        if self.next_frame - self.latest_unacked_frame >= self.window_size:
-            self.go_back_N()
-        if self.send_window[self.next_frame] == -1:
-            self.load_frames()
-        frame = self.frames[self.next_frame]
-        if frame == -1:
-            # No frame to send
-            return
-        transmission_time = self.frame_size / (self.bandwidth * 1e6)
-        propagation_time = self.delay / 1000
-        total_time = transmission_time + propagation_time
-        timeout = 2 * total_time
+        if self.frame_counter < len(self.frames):
+            frame = self.frames[0]
+            transmission_time = self.frame_size / (self.bandwidth * 1e6)
+            propagation_time = self.delay / 1000
+            total_time = transmission_time + propagation_time
+            timeout = 2 * total_time
 
-        print('send %d %d' % (self.next_frame, frame))
-        if random.random() > self.frame_error_rate:
-            print('frame %d sent.' % self.next_frame)
+            print('send %d %d' % (self.frame_counter, frame))
+            if random.random() > self.frame_error_rate:
+                # If no frame error
+                print('frame %d sent.' % self.frame_counter)
+                self.event_loop.add_event(
+                    Event(receiver.receive_frame, event_loop.current_time + total_time, frame, self))
+            else:
+                print('frame %d error.' % self.frame_counter)
             self.event_loop.add_event(
-                Event(receiver.receive_frame, event_loop.current_time + total_time, frame, self))
+                Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.frame_counter))
 
-        self.event_loop.add_event(
-            Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.next_frame))
+            # set the flag to indicate the sender is transmitting
+            self.transmitting = True
 
-        self.next_frame = (self.next_frame + 1) % self.window_size
+            self.event_loop.add_event(
+                Event(self.finish_transmission, event_loop.current_time + transmission_time, receiver)
+            )
 
     def handle_ack(self, receiver, ack):
-        # to be modified
-        # identify ack frame number
-        # clear self.send_window[frame number] (set to -1)
         if random.random() > self.ack_error_rate:
-            if ack == self.latest_unacked_frame:
-                print('frame %d acked.' % ack)
-                self.send_window[ack] = -1
-                self.latest_unacked_frame += 1
+            if ack == self.frame_counter ^ 1:
+                print('frame %d acked.' % self.frame_counter)
+                self.frame_counter ^= 1
+                self.frames = self.frames[1:]
                 if not self.transmitting:
                     self.send_frame(receiver)
                 else:
                     self.transmission_flag = True
-        pass
 
     def handle_timeout(self, receiver, timeout_frame_number):
-        # to be modified
-        # check whether timeout happens
-        # when timeout, go back N and .
-        pass
+        # resend when timeout
+        if self.frame_counter == timeout_frame_number:
+            print('resend %d' % self.frame_counter)
+            if not self.transmitting:
+                self.send_frame(receiver)
+            else:
+                self.transmission_flag = True
 
 
-class GBN_Receiver(Receiver):
-    def __init__(self, bandwidth, delay, bit_error_rate, ack_size, event_loop, window_size):
-        super().__init__(bandwidth, delay, bit_error_rate, ack_size, event_loop)
-        self.window_size = window_size
-        self.sequence_number_length = int(np.ceil(np.log2(self.window_size + 1)))
+class Receiver:
+    def __init__(self, bandwidth, delay, bit_error_rate, ack_size, event_loop):
+        self.bandwidth = bandwidth
+        self.delay = delay
+        self.bit_error_rate = bit_error_rate
+        self.ack_size = ack_size
+        self.ack_error_rate = 1 - (1 - bit_error_rate) ** ack_size
+        self.received_frames = []
+        self.expected_frame = 0
+        self.event_loop = event_loop
 
     def receive_frame(self, frame, sender):
-        # check frame sequence number
-        # to be modified. length of frame sequence number differs from stop and wait
-        if (frame & ((1 << self.sequence_number_length) - 1)) == self.expected_frame:
-            self.received_frames.append(frame >> self.sequence_number_length)
-            self.expected_frame = (self.expected_frame + 1) & ((1 << self.sequence_number_length) - 1)
+        # extract the one bit frame sequence number and compare to the expected frame number
+        if (frame & 1) == self.expected_frame:
+            self.received_frames.append(frame >> 1)
+            self.expected_frame ^= 1
         self.send_ack(sender)
+
+    def send_ack(self, sender):
+        transmission_time = self.ack_size / (self.bandwidth * 1e6)
+        propagation_time = self.delay / 1000
+        total_time = transmission_time + propagation_time
+        self.event_loop.add_event(
+            Event(sender.handle_ack, event_loop.current_time + total_time, self, self.expected_frame))
+
+
+class Event:
+    def __init__(self, handler, timestamp, *args):
+        self.handler = handler
+        self.timestamp = timestamp
+        self.args = args
+
+    def __lt__(self, other):
+        return self.timestamp < other.timestamp
+
+    def __str__(self):
+        return "% .1f\n" % (self.timestamp*1000) + self.handler.__name__
+
+
+class EventLoop:
+    def __init__(self):
+        self.event_queue = []
+        self.current_time = 0
+
+    def run(self, simulation_time=1e8):
+        while self.event_queue and self.current_time < simulation_time:
+            event = heapq.heappop(self.event_queue)
+            self.current_time = event.timestamp
+            print(event)
+            event.handler(*event.args)
+
+    def add_event(self, event):
+        heapq.heappush(self.event_queue, event)
+
+
+def WriteOutput():
+    file = open('output.txt', mode='w', encoding='utf-8')
+    file.write('bandwidth: ' + str(bandwidth) + '\n')
+    file.write('delay: ' + str(delay) + '\n')
+    file.write('theoretical efficiency: ' + str(theoretical_efficiency) + '\n')
+    file.write('experimental efficiency: ' + str(efficiency) + '\n')
+    file.close()
 
 
 if __name__ == "__main__":
@@ -109,15 +146,14 @@ if __name__ == "__main__":
     bandwidth = 1  # Mbps
     delay = 100  # ms
     bit_error_rate = 1e-5
-    frame_size = 1250 * 8  # bits
+    frame_size = 1250 * 8 # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
     num_frames = 1000000
-    window_size = 4
 
     event_loop = EventLoop()
-    sender = GBN_Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size)
-    receiver = GBN_Receiver(bandwidth, delay, bit_error_rate, ack_size, event_loop, window_size)
+    sender = Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop)
+    receiver = Receiver(bandwidth, delay, bit_error_rate, ack_size, event_loop)
 
     # Add the initial event to generate all frames
     sender.generate_all_frames(num_frames)
@@ -136,13 +172,10 @@ if __name__ == "__main__":
         print('frames unmatched.')
 
     # calculate efficiency
-    efficiency = (1 - header_size / frame_size) * len(
-        receiver.received_frames) * frame_size / event_loop.current_time / bandwidth / 1e6
+    efficiency = (1 - header_size / frame_size) * len(receiver.received_frames) * frame_size / event_loop.current_time / bandwidth / 1e6
     print('experimental efficiency: %f' % efficiency)
     # calculate theoretical efficiency
-    theoretical_efficiency = (1 - header_size / frame_size) / (
-            1 + ack_size / frame_size + 2 * delay * 1000 * bandwidth / frame_size) * (1 - bit_error_rate) ** (
-                                     frame_size + ack_size)
+    theoretical_efficiency = (1 - header_size / frame_size) / (1 + ack_size / frame_size + 2 * delay * 1000 * bandwidth / frame_size) * (1 - bit_error_rate) ** (frame_size + ack_size)
     print('theoretical efficiency: %f' % theoretical_efficiency)
 
     # write main data into output files
