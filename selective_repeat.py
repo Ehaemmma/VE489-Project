@@ -123,7 +123,7 @@ if __name__ == "__main__":
     frame_size = 1250 * 8  # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
-    num_frames = 1000
+    num_frames = 10
     window_size = 4
 
     event_loop = EventLoop()
