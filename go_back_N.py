@@ -15,17 +15,11 @@ class GBN_Sender(Sender):
         self.frame_error_rate = 1 - (1 - bit_error_rate) ** frame_size
         self.ack_error_rate = 1 - (1 - bit_error_rate) ** ack_size
         self.flag_no_frames = False
-        self.frames_copy = []
 
     def generate_all_frames(self, num_frames):
         # Add frame sequence number to the rightmost bits
         self.frames = [(i << self.n_o) | (i & ((1 << self.n_o) - 1)) for i in range(num_frames)]
         self.frames_copy = self.frames.copy()
-
-    def compare_frames(self, received_frames):
-        expected_frames = [frame >> self.n_o for frame in self.frames_copy]
-        # print(expected_frames)
-        return received_frames == expected_frames
 
     def finish_transmission(self, receiver):
         # one transmission is finished, next transmission can be started
