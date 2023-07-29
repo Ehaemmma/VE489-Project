@@ -14,10 +14,18 @@ class GBN_Sender(Sender):
         self.timeout_flag = False
         self.frame_error_rate = 1 - (1 - bit_error_rate) ** frame_size
         self.ack_error_rate = 1 - (1 - bit_error_rate) ** ack_size
+        self.flag_no_frames = False
+        self.frames_copy = []
 
     def generate_all_frames(self, num_frames):
         # Add frame sequence number to the rightmost bits
         self.frames = [(i << self.n_o) | (i & ((1 << self.n_o) - 1)) for i in range(num_frames)]
+        self.frames_copy = self.frames.copy()
+
+    def compare_frames(self, received_frames):
+        expected_frames = [frame >> self.n_o for frame in self.frames_copy]
+        # print(expected_frames)
+        return received_frames == expected_frames
 
     def finish_transmission(self, receiver):
         # one transmission is finished, next transmission can be started
@@ -44,27 +52,31 @@ class GBN_Sender(Sender):
         self.next_frame = self.latest_unacked_frame
 
     def send_frame(self, receiver):
-        if self.next_frame - self.latest_unacked_frame >= self.window_size or (self.next_frame < self.latest_unacked_frame and self.next_frame + (1 << self.n_o) - 1 - self.latest_unacked_frame >= self.window_size):
+        transmission_time = self.frame_size / (self.bandwidth * 1e6)
+        propagation_time = self.delay / 1000
+        total_time = transmission_time + propagation_time
+        timeout = 2 * total_time
+
+        if self.next_frame - self.latest_unacked_frame >= self.window_size or (
+                self.next_frame < self.latest_unacked_frame and self.next_frame + (
+                1 << self.n_o) - 1 - self.latest_unacked_frame >= self.window_size):
             self.go_back_N()
         if self.send_window[self.next_frame] == -1:
             self.load_frames()
         frame = self.send_window[self.next_frame]
         if frame == -1:
             # No frame to send
+            self.flag_no_frames = True
+            self.event_loop.add_event(
+                Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.next_frame))
+
             return
-        transmission_time = self.frame_size / (self.bandwidth * 1e6)
-        propagation_time = self.delay / 1000
-        total_time = transmission_time + propagation_time
-        timeout = 2 * total_time
 
         print('send %d %d' % (self.next_frame, frame))
         if random.random() > self.frame_error_rate:
             print('frame %d sent.' % self.next_frame)
             self.event_loop.add_event(
                 Event(receiver.receive_frame, event_loop.current_time + total_time, frame, self))
-
-        # self.event_loop.add_event(
-        #     Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.next_frame))
 
         self.next_frame = (self.next_frame + 1) & ((1 << self.n_o) - 1)
 
@@ -95,7 +107,11 @@ class GBN_Sender(Sender):
         # to be modified
         # check whether timeout happens
         # when timeout, go back N and .
-        return
+        if self.flag_no_frames:
+            if not timeout_frame_number == self.latest_unacked_frame:
+                self.flag_no_frames = True
+                self.go_back_N()
+                self.send_frame(receiver)
 
 
 class GBN_Receiver(Receiver):
@@ -122,12 +138,12 @@ if __name__ == "__main__":
 
     bandwidth = 1  # Mbps
     delay = 10  # ms
-    bit_error_rate = 1e-5
+    bit_error_rate = 1e-4
     frame_size = 1250 * 8  # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
     frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size)
-    num_frames = 1000000
+    num_frames = 10
     window_size = 10
 
     event_loop = EventLoop()
@@ -145,10 +161,11 @@ if __name__ == "__main__":
 
     # print("Received frames:", receiver.received_frames)
     print('last frame: %d' % receiver.received_frames[-1])
-    if receiver.received_frames == sender.frames:
+    if sender.compare_frames(receiver.received_frames):
         print('frames matched.')
     else:
         print('frames unmatched.')
+        print(receiver.received_frames)
 
     # calculate efficiency
     efficiency = (1 - header_size / frame_size) * len(
