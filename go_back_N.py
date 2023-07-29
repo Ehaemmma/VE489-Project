@@ -6,17 +6,14 @@ from stop_and_wait import Sender, Receiver, Event, EventLoop, WriteOutput
 class GBN_Sender(Sender):
     def __init__(self, bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size):
         super().__init__(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop)
-        self.n_o = np.ceil(np.log2(window_size + 1))
+        self.n_o = int(np.ceil(np.log2(window_size + 1)))
         self.window_size = window_size
         self.next_frame = 0
         self.latest_unacked_frame = 0
         self.send_window = [-1 for i in range(self.window_size)]
         self.timeout_flag = False
-    #
-    # def unacked(self, frame_number):
-    #     return (
-    #                 self.latest_acked_frame < frame_number < self.next_frame) if self.next_frame > self.latest_acked_frame else (
-    #                 frame_number > self.latest_acked_frame or frame_number < self.next_frame)
+        self.frame_error_rate = 1 - (1 - bit_error_rate) ** frame_size
+        self.ack_error_rate = 1 - (1 - bit_error_rate) ** ack_size
 
     def generate_all_frames(self, num_frames):
         # Add frame sequence number to the rightmost bits
@@ -34,10 +31,10 @@ class GBN_Sender(Sender):
     def load_frames(self):
         # load frames to window
         window_index = self.next_frame
-        while self.send_window[window_index] == -1:
+        while self.send_window[window_index % self.window_size] == -1:
             if len(self.frames) == 0:
                 return
-            self.window_size[window_index] = self.frames[0]
+            self.send_window[window_index] = self.frames[0]
             self.frames = self.frames[1:]
             window_index = (1 + window_index) % self.window_size
 
@@ -73,6 +70,15 @@ class GBN_Sender(Sender):
         # to be modified
         # identify ack frame number
         # clear self.send_window[frame number] (set to -1)
+        if random.random() > self.ack_error_rate:
+            if ack == self.latest_unacked_frame:
+                print('frame %d acked.' % ack)
+                self.send_window[ack] = -1
+                self.latest_unacked_frame += 1
+                if not self.transmitting:
+                    self.send_frame(receiver)
+                else:
+                    self.transmission_flag = True
         pass
 
     def handle_timeout(self, receiver, timeout_frame_number):
