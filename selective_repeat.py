@@ -14,6 +14,7 @@ class SR_Sender(Sender):
         self.nak_frame = -1
         self.flag_no_frames = False
         self.n_o = int(np.ceil(np.log2(2 * window_size + 1)))
+        self.ignore_nak = -1
 
     def generate_all_frames(self, num_frames):
         # Add frame sequence number to bit 0
@@ -40,11 +41,15 @@ class SR_Sender(Sender):
 
         if not self.nak_frame == -1:
             frame = self.nak_frame
+            print('resend frame %d.' % (self.nak_frame & ((1 << self.n_o) - 1)))
+            self.event_loop.add_event(
+                Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.nak_frame))
             self.nak_frame = -1
-            print('resend frame %d.' % frame)
+            self.ignore_nak = frame
         else:
             if self.next_frame - self.latest_unacked_frame >= self.window_size:
-                self.next_frame -= 1
+                print('window is full.')
+                self.next_frame = self.latest_unacked_frame
                 frame = self.next_frame
             else:
                 frame = self.next_frame
@@ -54,15 +59,16 @@ class SR_Sender(Sender):
                 # No frame to send
                 print('no frames to send.')
                 self.flag_no_frames = True
-                self.event_loop.add_event(
-                    Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.next_frame))
+                if not self.ignore_nak == -1:
+                    self.event_loop.add_event(
+                        Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.next_frame - 1))
 
                 return
 
             print('send %d %d' % (self.next_frame & ((1 << self.n_o) - 1), frame))
             self.next_frame += 1
         if random.random() >= self.frame_error_rate:
-            print('frame %d sent.' % frame)
+            print('frame %d sent.' % (frame & ((1 << self.n_o) - 1)))
             self.event_loop.add_event(
                 Event(receiver.receive_frame, event_loop.current_time + total_time, frame, self))
 
@@ -77,7 +83,7 @@ class SR_Sender(Sender):
     def handle_ack(self, receiver, ack):
         if random.random() >= self.ack_error_rate:  # successfully receive ack
             if ack >= self.latest_unacked_frame + 1:
-                print('frame ' + str(self.latest_unacked_frame) + ' acked.')
+                print('frame ' + str(self.latest_unacked_frame& ((1 << self.n_o) - 1)) + ' acked.')
                 self.latest_unacked_frame = ack
                 if self.nak_frame < self.latest_unacked_frame:
                     self.nak_frame = -1
@@ -88,6 +94,8 @@ class SR_Sender(Sender):
                 # self.next_frame = ack
             else:
                 if ack == self.next_frame:
+                    return
+                if ack == self.ignore_nak:
                     return
                 print('latest unack: %d.' % self.latest_unacked_frame)
                 print('frame ' + str(ack) + ' naked.')
@@ -101,11 +109,16 @@ class SR_Sender(Sender):
 
     def handle_timeout(self, receiver, timeout_frame_number):
         # resend when timeout
-        if self.flag_no_frames and not self.latest_unacked_frame == self.next_frame:
-            print(self.latest_unacked_frame, self.next_frame)
-            self.flag_no_frames = False
-            self.next_frame -= 1
-            self.send_frame(receiver)
+        if self.latest_unacked_frame <= timeout_frame_number:
+            # print(self.latest_unacked_frame, self.next_frame)
+            # self.next_frame -= 1
+            if self.nak_frame == -1:
+                # no new nak after timeout is added to eventloop
+                self.ignore_nak = -1
+            self.nak_frame = timeout_frame_number
+            if self.flag_no_frames:
+                self.flag_no_frames = False
+                self.send_frame(receiver)
 
 
 class SR_Receiver(Receiver):
@@ -113,6 +126,7 @@ class SR_Receiver(Receiver):
         super().__init__(bandwidth, delay, bit_error_rate, ack_size, event_loop)
         self.window_size = window_size
         self.unreceived_frames = []
+        self.n_o = int(np.ceil(np.log2(2 * window_size + 1)))
 
     def receive_frame(self, frame, sender):
         # extract the one bit frame sequence number and compare to the expected frame number
@@ -140,7 +154,7 @@ class SR_Receiver(Receiver):
             #     if i not in self.received_frames:
             #         self.unreceived_frames.append(i)
             self.send_ack(sender)
-        print('frame %d received.' % frame)
+        print('frame %d received.' % (frame & ((1 << self.n_o) - 1)))
         # print(self.received_frames)
         # print(self.unreceived_frames)
 
@@ -153,17 +167,20 @@ class SR_Receiver(Receiver):
 
 
 if __name__ == "__main__":
+    random.seed(0)
+
     time_limit = 1 * 60  # seconds
 
     bandwidth = 1  # Mbps
     delay = 10  # ms
-    bit_error_rate = 1e-5
+    bit_error_rate = 1e-4
     frame_size = 1250 * 8  # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
-    num_frames = 1000000
-    window_size = 10
+    num_frames = 100000
+    window_size = 500
     frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size)
+    print(frame_error_rate)
 
     event_loop = EventLoop()
     sender = SR_Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size)
@@ -188,8 +205,8 @@ if __name__ == "__main__":
         print('frames unmatched.')
 
     # calculate efficiency
-    efficiency = (1 - header_size / frame_size) * len(
-        receiver.received_frames) * frame_size / event_loop.current_time / bandwidth / 1e6
+    efficiency = (1 - header_size / frame_size) * (len(
+        receiver.received_frames) + len(receiver.unreceived_frames)) * frame_size / event_loop.current_time / bandwidth / 1e6
     print('experimental efficiency: %f' % efficiency)
     # calculate theoretical efficiency
     theoretical_efficiency = (1 - header_size / frame_size) * (1 - bit_error_rate) ** (

@@ -137,7 +137,7 @@ if __name__ == "__main__":
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
     frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size)
-    num_frames = 10
+    num_frames = 1000000
     window_size = 10
 
     event_loop = EventLoop()
@@ -159,7 +159,7 @@ if __name__ == "__main__":
         print('frames matched.')
     else:
         print('frames unmatched.')
-        print(receiver.received_frames)
+        # print(receiver.received_frames)
 
     # calculate efficiency
     efficiency = (1 - header_size / frame_size) * len(
