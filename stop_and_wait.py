@@ -15,12 +15,20 @@ class Sender:
         self.frame_counter = 0  # first un-ACKed frame number
         self.event_loop = event_loop
         self.transmitting = False  # indicate whether the sender is transmitting a frame
-        self.transmission_flag = False  # indicate whether there is a frame to be resent (but is waiting for the transmission to be ended)
+        self.transmission_flag = False  # indicate whether there is a frame to be sent (but is waiting for the transmission to be ended)
+        self.frames_copy = []
+        self.n_o = 1
 
     def generate_all_frames(self, num_frames):
         # Add frame sequence number to bit 0
         # One bit frame sequence number for stop and wait
         self.frames = [(i << 1) | (i & 1) for i in range(num_frames)]
+        self.frames_copy = self.frames.copy()
+
+    def compare_frames(self, received_frames):
+        expected_frames = [frame >> self.n_o for frame in self.frames_copy]
+        # print(expected_frames)
+        return received_frames == expected_frames
 
     def finish_transmission(self, receiver):
         # one fransmission is finished, next transmission can be started
@@ -92,7 +100,7 @@ class Receiver:
         if (frame & 1) == self.expected_frame:
             self.received_frames.append(frame >> 1)
             self.expected_frame ^= 1
-            self.send_ack(sender)
+        self.send_ack(sender)
 
     def send_ack(self, sender):
         transmission_time = self.ack_size / (self.bandwidth * 1e6)
@@ -112,7 +120,7 @@ class Event:
         return self.timestamp < other.timestamp
 
     def __str__(self):
-        return "%.1f\n" % (self.timestamp*1000) + self.handler.__name__
+        return "% .1f\n" % (self.timestamp*1000) + self.handler.__name__
 
 
 class EventLoop:
@@ -145,11 +153,11 @@ if __name__ == "__main__":
 
     bandwidth = 1  # Mbps
     delay = 100  # ms
-    bit_error_rate = 0
+    bit_error_rate = 1e-5
     frame_size = 1250 * 8 # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
-    num_frames = 20
+    num_frames = 1000000
 
     event_loop = EventLoop()
     sender = Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop)

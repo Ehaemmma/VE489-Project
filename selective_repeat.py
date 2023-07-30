@@ -17,6 +17,10 @@ class SR_Sender(Sender):
         # One bit frame sequence number for stop and wait
         self.frames = [i for i in range(num_frames)]
         self.frames_numbers = num_frames
+        self.frames_copy = self.frames.copy()
+
+    def compare_frames(self, received_frames):
+        return self.frames_copy == received_frames
 
     def finish_transmission(self, receiver):
         # one fransmission is finished, next transmission can be started
@@ -72,8 +76,9 @@ class SR_Sender(Sender):
                 else:
                     self.transmission_flag = True
                 self.next_frame = ack
-        else:  # ack transmission fail
-            pass
+        else:
+            # ack transmission fail
+            print('ack %d lost.' % ack)
 
     def handle_timeout(self, receiver, timeout_frame_number):
         # resend when timeout
@@ -118,7 +123,7 @@ if __name__ == "__main__":
     time_limit = 1 * 60  # seconds
 
     bandwidth = 1  # Mbps
-    delay = 100  # ms
+    delay = 10  # ms
     bit_error_rate = 1e-5
     frame_size = 1250 * 8  # bits
     ack_size = 25 * 8  # bits
@@ -141,9 +146,11 @@ if __name__ == "__main__":
 
     # print("Received frames:", receiver.received_frames)
     print('last frame: %d' % receiver.received_frames[-1])
-    if receiver.received_frames == sender.frames:
+    if sender.compare_frames(receiver.received_frames):
         print('frames matched.')
     else:
+        print('received:')
+        print(receiver.received_frames)
         print('frames unmatched.')
 
     # calculate efficiency
