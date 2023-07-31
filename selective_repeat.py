@@ -65,13 +65,14 @@ class SR_Sender(Sender):
 
                 return
 
-            print('send %d %d' % (self.next_frame & ((1 << self.n_o) - 1), frame))
+            # print('send %d %d' % (self.next_frame & ((1 << self.n_o) - 1), frame))
             self.next_frame += 1
         if random.random() >= self.frame_error_rate:
-            print('frame %d sent.' % (frame & ((1 << self.n_o) - 1)))
+            print('frame %d sent. frame: %d' % ((frame & ((1 << self.n_o) - 1)), frame))
             self.event_loop.add_event(
                 Event(receiver.receive_frame, event_loop.current_time + total_time, frame, self))
-
+        else:
+            print('frame %d not sent. frame: %d' % ((frame & ((1 << self.n_o) - 1)), frame))
         # self.event_loop.add_event(
         #     Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.next_frame))
         self.transmitting = True
@@ -173,14 +174,24 @@ if __name__ == "__main__":
 
     bandwidth = 1  # Mbps
     delay = 10  # ms
-    bit_error_rate = 1e-4
+    bit_error_rate = 4e-5
     frame_size = 1250 * 8  # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
-    num_frames = 100000
+    num_frames = 15
     window_size = 20
     frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size)
-    print(frame_error_rate)
+    # print(frame_error_rate)
+
+    variables = [time_limit, bandwidth, delay, bit_error_rate, frame_size, ack_size, header_size, frame_error_rate,
+                 num_frames, window_size]
+    variable_names = ["time_limit", "bandwidth", "delay", "bit_error_rate", "frame_size", "ack_size", "header_size",
+                      "frame_error_rate", "num_frames", "window_size"]
+
+    for i in range(len(variables)):
+        print(f"{variable_names[i]}: {variables[i]}")
+
+    print("-" * 20 + "simulation result" + "-" * 20)
 
     event_loop = EventLoop()
     sender = SR_Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size)
