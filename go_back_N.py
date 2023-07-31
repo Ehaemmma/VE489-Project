@@ -60,18 +60,20 @@ class GBN_Sender(Sender):
         frame = self.send_window[self.next_frame]
         if frame == -1:
             # No frame to send
+            print('no frame to send.')
             self.flag_no_frames = True
             self.event_loop.add_event(
                 Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.next_frame))
 
             return
 
-        print('send %d %d' % (self.next_frame, frame))
+        # print('send %d %d' % (self.next_frame, frame))
         if random.random() > self.frame_error_rate:
-            print('frame %d sent.' % self.next_frame)
+            print('frame %d sent. frame: %d' % (self.next_frame, frame >> self.n_o))
             self.event_loop.add_event(
                 Event(receiver.receive_frame, event_loop.current_time + total_time, frame, self))
-
+        else:
+            print('frame %d not sent. frame: %d' % (self.next_frame, frame >> self.n_o))
         self.next_frame = (self.next_frame + 1) & ((1 << self.n_o) - 1)
 
         # set the flag to indicate the sender is transmitting
@@ -123,7 +125,8 @@ class GBN_Receiver(Receiver):
             self.received_frames.append(frame >> self.sequence_number_length)
             self.expected_frame = (self.expected_frame + 1) & ((1 << self.sequence_number_length) - 1)
         else:
-            print('frame %d naked.' % self.expected_frame)
+            # print('frame %d naked.' % self.expected_frame)
+            pass
         self.send_ack(sender)
 
 
@@ -131,13 +134,13 @@ if __name__ == "__main__":
     time_limit = 1 * 60  # seconds
 
     bandwidth = 1  # Mbps
-    delay = 10  # ms
-    bit_error_rate = 1e-4
+    delay = 1  # ms
+    bit_error_rate = 2e-5
     frame_size = 1250 * 8  # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
     frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size)
-    num_frames = 1000000
+    num_frames = 10
     window_size = 4
 
     variables = [time_limit, bandwidth, delay, bit_error_rate, frame_size, ack_size, header_size, frame_error_rate,
@@ -147,6 +150,8 @@ if __name__ == "__main__":
 
     for i in range(len(variables)):
         print(f"{variable_names[i]}: {variables[i]}")
+
+    print("-" * 20 + "simulation result" + "-" * 20)
 
     event_loop = EventLoop()
     sender = GBN_Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size)
