@@ -45,14 +45,14 @@ class Sender:
             total_time = transmission_time + propagation_time
             timeout = 2 * total_time
 
-            print('send %d %d' % (self.frame_counter, frame))
+            # print('send %d %d' % (self.frame_counter, frame))
             if random.random() > self.frame_error_rate:
                 # If no frame error
-                print('frame %d sent.' % self.frame_counter)
+                print('frame %d sent. frame: %d' % (self.frame_counter, frame >> 1))
                 self.event_loop.add_event(
                     Event(receiver.receive_frame, event_loop.current_time + total_time, frame, self))
             else:
-                print('frame %d error.' % self.frame_counter)
+                print('frame %d not sent. frame: %d' % (self.frame_counter, frame >> 1))
             self.event_loop.add_event(
                 Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.frame_counter))
 
@@ -77,11 +77,13 @@ class Sender:
     def handle_timeout(self, receiver, timeout_frame_number):
         # resend when timeout
         if self.frame_counter == timeout_frame_number:
-            print('resend %d' % self.frame_counter)
+            print('frame %d timeout, resending.' % self.frame_counter)
             if not self.transmitting:
                 self.send_frame(receiver)
             else:
                 self.transmission_flag = True
+        else:
+            print('frame %d not timeout.' % timeout_frame_number)
 
 
 class Receiver:
@@ -120,7 +122,7 @@ class Event:
         return self.timestamp < other.timestamp
 
     def __str__(self):
-        return "% .1f\n" % (self.timestamp*1000) + self.handler.__name__
+        return "%.1f " % (self.timestamp*1000) + self.handler.__name__
 
 
 class EventLoop:
@@ -149,15 +151,28 @@ def WriteOutput():
 
 
 if __name__ == "__main__":
+    random.seed(0)
+
     time_limit = 1 * 60  # seconds
 
     bandwidth = 1  # Mbps
     delay = 100  # ms
-    bit_error_rate = 1e-5
+    bit_error_rate = 6e-5
     frame_size = 1250 * 8 # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
-    num_frames = 1000000
+    num_frames = 3
+    frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size + ack_size)
+
+    variables = [time_limit, bandwidth, delay, bit_error_rate, frame_size, ack_size, header_size, frame_error_rate,
+                 num_frames]
+    variable_names = ["time_limit", "bandwidth", "delay", "bit_error_rate", "frame_size", "ack_size", "header_size",
+                      "frame_error_rate", "num_frames"]
+
+    for i in range(len(variables)):
+        print(f"{variable_names[i]}: {variables[i]}")
+
+    print("-" * 20 + "simulation result" + "-" * 20)
 
     event_loop = EventLoop()
     sender = Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop)
@@ -174,7 +189,7 @@ if __name__ == "__main__":
 
     # print("Received frames:", receiver.received_frames)
     print('last frame: %d' % receiver.received_frames[-1])
-    if receiver.received_frames == sender.frames:
+    if sender.compare_frames(receiver.received_frames):
         print('frames matched.')
     else:
         print('frames unmatched.')

@@ -138,7 +138,15 @@ if __name__ == "__main__":
     header_size = 25 * 8  # bit
     frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size)
     num_frames = 1000000
-    window_size = 10
+    window_size = 4
+
+    variables = [time_limit, bandwidth, delay, bit_error_rate, frame_size, ack_size, header_size, frame_error_rate,
+                 num_frames, window_size]
+    variable_names = ["time_limit", "bandwidth", "delay", "bit_error_rate", "frame_size", "ack_size", "header_size",
+                      "frame_error_rate", "num_frames", "window_size"]
+
+    for i in range(len(variables)):
+        print(f"{variable_names[i]}: {variables[i]}")
 
     event_loop = EventLoop()
     sender = GBN_Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size)
