@@ -2,6 +2,7 @@ from stop_and_wait import Sender, Receiver, Event, EventLoop
 from go_back_N import GBN_Sender, GBN_Receiver
 import numpy as np
 import random
+import sys
 
 
 class SR_Sender(Sender):
@@ -172,13 +173,13 @@ if __name__ == "__main__":
 
     time_limit = 1 * 60  # seconds
 
-    bandwidth = 1  # Mbps
-    delay = 10  # ms
-    bit_error_rate = 4e-5
+    bandwidth = int(sys.argv[1])  # Mbps
+    delay = int(sys.argv[2])  # ms
+    bit_error_rate = float(sys.argv[3])
     frame_size = 1250 * 8  # bits
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
-    num_frames = 15
+    num_frames = 1000
     window_size = 20
     frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size)
     # print(frame_error_rate)
@@ -188,10 +189,10 @@ if __name__ == "__main__":
     variable_names = ["time_limit", "bandwidth", "delay", "bit_error_rate", "frame_size", "ack_size", "header_size",
                       "frame_error_rate", "num_frames", "window_size"]
 
-    for i in range(len(variables)):
-        print(f"{variable_names[i]}: {variables[i]}")
-
-    print("-" * 20 + "simulation result" + "-" * 20)
+    # for i in range(len(variables)):
+    #     print(f"{variable_names[i]}: {variables[i]}")
+    #
+    # print("-" * 20 + "simulation result" + "-" * 20)
 
     event_loop = EventLoop()
     sender = SR_Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop, window_size)
@@ -204,16 +205,16 @@ if __name__ == "__main__":
     # Run the event loop
     event_loop.run(simulation_time=time_limit)
 
-    print(event_loop.current_time)
+    # print(event_loop.current_time)
 
     # print("Received frames:", receiver.received_frames)
-    print('last frame: %d' % receiver.received_frames[-1])
-    if sender.compare_frames(receiver.received_frames):
-        print('frames matched.')
-    else:
-        # print('received:')
-        # print(receiver.received_frames)
-        print('frames unmatched.')
+    # print('last frame: %d' % receiver.received_frames[-1])
+    # if sender.compare_frames(receiver.received_frames):
+    #     print('frames matched.')
+    # else:
+    #     # print('received:')
+    #     # print(receiver.received_frames)
+    #     print('frames unmatched.')
 
     # calculate efficiency
     efficiency = (1 - header_size / frame_size) * (len(
@@ -223,3 +224,15 @@ if __name__ == "__main__":
     theoretical_efficiency = (1 - header_size / frame_size) * (1 - bit_error_rate) ** (
         frame_size)
     print('theoretical efficiency: %f' % theoretical_efficiency)
+
+    # write main data into output files
+    file = open('selective_repeat.txt', mode='a+', encoding='utf-8')
+    file.write('bandwidth: ' + str(bandwidth) + 'Mbps\n')
+    file.write('delay: ' + str(delay) + 'ms\n')
+    file.write('bit error rate: ' + str(bit_error_rate) + '\n')
+    file.write('frame error rate' + str(frame_error_rate) + '\n')
+    file.write('window size' + str(window_size) + '\n')
+    file.write('theoretical efficiency: ' + str(theoretical_efficiency) + '\n')
+    file.write('experimental efficiency: ' + str(efficiency) + '\n\n')
+    file.close()
+

@@ -132,7 +132,7 @@ if __name__ == "__main__":
     frame_size = 1250 * 8 # bits
     ack_size = 25 * 8  # bits
     header_size = 1  # bit
-    num_frames = 1000000
+    num_frames = 1000
 
     event_loop = EventLoop()
     sender = Sender(bandwidth, delay, bit_error_rate, frame_size, ack_size, event_loop)

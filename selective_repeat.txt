@@ -1,0 +1,40 @@
+bandwidth: 10Mbps
+delay: 1ms
+bit error rate: 0.0
+frame error rate0.0
+window size20
+theoretical efficiency: 0.98
+experimental efficiency: 0.9780243907307231
+
+bandwidth: 10Mbps
+delay: 1ms
+bit error rate: 1e-06
+frame error rate0.009950171201369096
+window size20
+theoretical efficiency: 0.9702488322226582
+experimental efficiency: 0.9636184857423803
+
+bandwidth: 10Mbps
+delay: 1ms
+bit error rate: 1e-05
+frame error rate0.09516303438524065
+window size20
+theoretical efficiency: 0.8867402263024642
+experimental efficiency: 0.8462867012089926
+
+bandwidth: 10Mbps
+delay: 1ms
+bit error rate: 0.0001
+frame error rate0.6321389535670295
+window size20
+theoretical efficiency: 0.36050382550431104
+experimental efficiency: 0.3472838234925111
+
+bandwidth: 10Mbps
+delay: 10ms
+bit error rate: 0.0
+frame error rate0.0
+window size20
+theoretical efficiency: 0.98
+experimental efficiency: 0.4622641509434224
+
