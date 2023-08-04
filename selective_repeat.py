@@ -180,7 +180,7 @@ if __name__ == "__main__":
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
     num_frames = 1000
-    window_size = 20
+    window_size = num_frames
     frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size)
     # print(frame_error_rate)
 

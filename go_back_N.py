@@ -51,6 +51,7 @@ class GBN_Sender(Sender):
         propagation_time = self.delay / 1000
         total_time = transmission_time + propagation_time
         timeout = 2 * total_time
+        self.window_size = np.ceil(2 * total_time / transmission_time)
 
         if self.next_frame - self.latest_unacked_frame >= self.window_size or (
                 self.next_frame < self.latest_unacked_frame and self.next_frame + (
@@ -191,7 +192,7 @@ if __name__ == "__main__":
     file.write('delay: ' + str(delay) + 'ms\n')
     file.write('bit error rate: ' + str(bit_error_rate) + '\n')
     file.write('frame error rate' + str(frame_error_rate) + '\n')
-    file.write('window size' + str(window_size) + '\n')
+    file.write('window size' + str(sender.window_size) + '\n')
     file.write('theoretical efficiency: ' + str(theoretical_efficiency) + '\n')
     file.write('experimental efficiency: ' + str(efficiency) + '\n\n')
     file.close()
