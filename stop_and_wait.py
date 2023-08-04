@@ -19,6 +19,7 @@ class Sender:
         self.transmission_flag = False  # indicate whether there is a frame to be sent (but is waiting for the transmission to be ended)
         self.frames_copy = []
         self.n_o = 1
+        self.frame_idx = 0
 
     def generate_all_frames(self, num_frames):
         # Add frame sequence number to bit 0
@@ -39,8 +40,8 @@ class Sender:
             self.send_frame(receiver)
 
     def send_frame(self, receiver):
-        if self.frame_counter < len(self.frames):
-            frame = self.frames[0]
+        if self.frame_idx < len(self.frames):
+            frame = self.frames[self.frame_idx]
             transmission_time = self.frame_size / (self.bandwidth * 1e6)
             propagation_time = self.delay / 1000
             total_time = transmission_time + propagation_time
@@ -70,7 +71,7 @@ class Sender:
             if ack == self.frame_counter ^ 1:
                 # print('frame %d acked.' % self.frame_counter)
                 self.frame_counter ^= 1
-                self.frames = self.frames[1:]
+                self.frame_idx += 1
                 if not self.transmitting:
                     self.send_frame(receiver)
                 else:

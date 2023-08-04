@@ -17,6 +17,7 @@ class SR_Sender(Sender):
         self.n_o = int(np.ceil(np.log2(2 * window_size + 1)))
         self.ignore_nak = -1
 
+
     def generate_all_frames(self, num_frames):
         # Add frame sequence number to bit 0
         # One bit frame sequence number for stop and wait
@@ -131,6 +132,7 @@ class SR_Receiver(Receiver):
         self.window_size = window_size
         self.unreceived_frames = []
         self.n_o = int(np.ceil(np.log2(2 * window_size + 1)))
+        self.unreceived_idx = 0
 
     def receive_frame(self, frame, sender):
         # extract the one bit frame sequence number and compare to the expected frame number
@@ -139,10 +141,10 @@ class SR_Receiver(Receiver):
             #     self.unreceived_frames.remove(frame)
             self.received_frames.append(frame)
             self.expected_frame += 1
-            while len(self.unreceived_frames) > 0 and self.unreceived_frames[0] == self.expected_frame:
-                self.received_frames.append(self.unreceived_frames[0])
+            while len(self.unreceived_frames) > self.unreceived_idx and self.unreceived_frames[self.unreceived_idx] == self.expected_frame:
+                self.received_frames.append(self.unreceived_frames[self.unreceived_idx])
                 self.expected_frame += 1
-                self.unreceived_frames.pop(0)
+                self.unreceived_idx += 1
             #
             # if len(self.unreceived_frames) == 0:
             #     self.expected_frame = len(self.received_frames)
@@ -193,7 +195,6 @@ if __name__ == "__main__":
 
     # for i in range(len(variables)):
     #     print(f"{variable_names[i]}: {variables[i]}")
-    #
     # print("-" * 20 + "simulation result" + "-" * 20)
 
     event_loop = EventLoop()
@@ -219,8 +220,12 @@ if __name__ == "__main__":
         print('frames unmatched.')
 
     # calculate efficiency
-    efficiency = (1 - header_size / frame_size) * (len(
-        receiver.received_frames) + len(receiver.unreceived_frames)) * frame_size / event_loop.current_time / bandwidth / 1e6
+
+    # print(receiver.unreceived_frames[receiver.unreceived_idx:])
+    # print(receiver.received_frames)
+    # print(len(receiver.received_frames))
+    # print(receiver.unreceived_frames[receiver.unreceived_idx:])
+    efficiency = (1 - header_size / frame_size) * (len(receiver.unreceived_frames) + len(receiver.received_frames) - receiver.unreceived_idx) * frame_size / event_loop.current_time / bandwidth / 1e6
     print('experimental efficiency: %f' % efficiency)
     # calculate theoretical efficiency
     theoretical_efficiency = (1 - header_size / frame_size) * (1 - bit_error_rate) ** (

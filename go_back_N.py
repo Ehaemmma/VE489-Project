@@ -36,7 +36,8 @@ class GBN_Sender(Sender):
         # load frames to window
         window_index = self.next_frame
         while self.send_window[window_index] == -1:
-            if len(self.frames) == 0:
+            if len(self.frames) == self.frame_idx:
+                print('no frame')
                 return
             self.send_window[window_index] = self.frames[self.frame_idx]
             self.frame_idx += 1
@@ -144,7 +145,7 @@ if __name__ == "__main__":
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
     frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size)
-    num_frames = 1000000
+    num_frames = 5000000
     transmission_time = frame_size / (bandwidth * 1e6)
     propagation_time = delay / 1000
     total_time = transmission_time + propagation_time
