@@ -16,6 +16,7 @@ class GBN_Sender(Sender):
         self.frame_error_rate = 1 - (1 - bit_error_rate) ** frame_size
         self.ack_error_rate = 1 - (1 - bit_error_rate) ** ack_size
         self.flag_no_frames = False
+        self.frame_idx = 0
 
     def generate_all_frames(self, num_frames):
         # Add frame sequence number to the rightmost bits
@@ -37,13 +38,13 @@ class GBN_Sender(Sender):
         while self.send_window[window_index] == -1:
             if len(self.frames) == 0:
                 return
-            self.send_window[window_index] = self.frames[0]
-            self.frames = self.frames[1:]
+            self.send_window[window_index] = self.frames[self.frame_idx]
+            self.frame_idx += 1
             window_index = window_index & ((1 << self.n_o) - 1)
 
     def go_back_N(self):
-        print('go back N.')
-        print('resend from %d.' % self.latest_unacked_frame)
+        # print('go back N.')
+        # print('resend from %d.' % self.latest_unacked_frame)
         self.next_frame = self.latest_unacked_frame
 
     def send_frame(self, receiver):
@@ -51,7 +52,7 @@ class GBN_Sender(Sender):
         propagation_time = self.delay / 1000
         total_time = transmission_time + propagation_time
         timeout = 2 * total_time
-        self.window_size = np.ceil(2 * total_time / transmission_time)
+        # self.window_size = np.ceil(2 * total_time / transmission_time)
 
         if self.next_frame - self.latest_unacked_frame >= self.window_size or (
                 self.next_frame < self.latest_unacked_frame and self.next_frame + (
@@ -71,11 +72,12 @@ class GBN_Sender(Sender):
 
         # print('send %d %d' % (self.next_frame, frame))
         if random.random() > self.frame_error_rate:
-            print('frame %d sent. frame: %d' % (self.next_frame, frame >> self.n_o))
+            # print('frame %d sent. frame: %d' % (self.next_frame, frame >> self.n_o))
             self.event_loop.add_event(
                 Event(receiver.receive_frame, event_loop.current_time + total_time, frame, self))
         else:
-            print('frame %d not sent. frame: %d' % (self.next_frame, frame >> self.n_o))
+            pass
+            # print('frame %d not sent. frame: %d' % (self.next_frame, frame >> self.n_o))
         self.next_frame = (self.next_frame + 1) & ((1 << self.n_o) - 1)
 
         # set the flag to indicate the sender is transmitting
@@ -95,7 +97,7 @@ class GBN_Sender(Sender):
             ack_in_window = (l <= ack <= r) if l <= r else (l <= ack or ack <= r)
             if ack_in_window:
                 while not self.latest_unacked_frame == ack:
-                    print('frame %d acked.' % self.latest_unacked_frame)
+                    # print('frame %d acked.' % self.latest_unacked_frame)
                     self.send_window[self.latest_unacked_frame] = -1
                     self.latest_unacked_frame = (self.latest_unacked_frame + 1) & ((1 << self.n_o) - 1)
                 # self.latest_unacked_frame = ack
@@ -142,8 +144,13 @@ if __name__ == "__main__":
     ack_size = 25 * 8  # bits
     header_size = 25 * 8  # bit
     frame_error_rate = 1 - (1 - bit_error_rate) ** (frame_size)
-    num_frames = 1000
-    window_size = 4
+    num_frames = 1000000
+    transmission_time = frame_size / (bandwidth * 1e6)
+    propagation_time = delay / 1000
+    total_time = transmission_time + propagation_time
+    timeout = 2 * total_time
+    window_size = np.ceil(2 * total_time / transmission_time)
+
 
     variables = [time_limit, bandwidth, delay, bit_error_rate, frame_size, ack_size, header_size, frame_error_rate,
                  num_frames, window_size]
@@ -170,10 +177,10 @@ if __name__ == "__main__":
 
     # print("Received frames:", receiver.received_frames)
     # print('last frame: %d' % receiver.received_frames[-1])
-    # if sender.compare_frames(receiver.received_frames):
-    #     print('frames matched.')
-    # else:
-    #     print('frames unmatched.')
+    if sender.compare_frames(receiver.received_frames):
+        print('frames matched.')
+    else:
+        print('frames unmatched.')
         # print(receiver.received_frames)
 
     # calculate efficiency

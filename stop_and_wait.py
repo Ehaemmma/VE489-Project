@@ -49,11 +49,12 @@ class Sender:
             # print('send %d %d' % (self.frame_counter, frame))
             if random.random() > self.frame_error_rate:
                 # If no frame error
-                print('frame %d sent. frame: %d' % (self.frame_counter, frame >> 1))
+                # print('frame %d sent. frame: %d' % (self.frame_counter, frame >> 1))
                 self.event_loop.add_event(
                     Event(receiver.receive_frame, event_loop.current_time + total_time, frame, self))
             else:
-                print('frame %d not sent. frame: %d' % (self.frame_counter, frame >> 1))
+                pass
+                # print('frame %d not sent. frame: %d' % (self.frame_counter, frame >> 1))
             self.event_loop.add_event(
                 Event(self.handle_timeout, event_loop.current_time + timeout, receiver, self.frame_counter))
 
@@ -67,7 +68,7 @@ class Sender:
     def handle_ack(self, receiver, ack):
         if random.random() > self.ack_error_rate:
             if ack == self.frame_counter ^ 1:
-                print('frame %d acked.' % self.frame_counter)
+                # print('frame %d acked.' % self.frame_counter)
                 self.frame_counter ^= 1
                 self.frames = self.frames[1:]
                 if not self.transmitting:
@@ -78,13 +79,14 @@ class Sender:
     def handle_timeout(self, receiver, timeout_frame_number):
         # resend when timeout
         if self.frame_counter == timeout_frame_number:
-            print('frame %d timeout, resending.' % self.frame_counter)
+            # print('frame %d timeout, resending.' % self.frame_counter)
             if not self.transmitting:
                 self.send_frame(receiver)
             else:
                 self.transmission_flag = True
         else:
-            print('frame %d not timeout.' % timeout_frame_number)
+            pass
+            # print('frame %d not timeout.' % timeout_frame_number)
 
 
 class Receiver:
@@ -135,7 +137,7 @@ class EventLoop:
         while self.event_queue and self.current_time < simulation_time:
             event = heapq.heappop(self.event_queue)
             self.current_time = event.timestamp
-            print(event)
+            # print(event)
             event.handler(*event.args)
 
     def add_event(self, event):
